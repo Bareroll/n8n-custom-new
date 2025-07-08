@@ -1,0 +1,16 @@
+
+services:
+  n8n:
+    build: .
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./workspace:/tmp/workspace  # ✅ Mount for audio/transcript files
+    environment:
+      - TZ=America/Los_Angeles
+      - GENERIC_TIMEZONE=America/Los_Angeles
+    restart: unless-stopped  # ✅ Keeps it running unless manually stopped
+volumes:
+  n8n_data:
+

@@ -1,0 +1,648 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -4660,
+        1560
+      ],
+      "id": "6362fc53-867b-4edb-aa86-8c05865afec9",
+      "name": "When clicking 'Execute workflow'"
+    },
+    {
+      "parameters": {
+        "mode": "mergeByIndex"
+      },
+      "id": "acdd62ff-87ce-4e57-8636-8a165f9a20b5",
+      "name": "Merge Video Metadata",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 1,
+      "position": [
+        -3420,
+        1480
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "return [{\n  json: {\n    ...$json,\n    videoFile: $json.videoFile || $item(0).$json.videoFile\n  }\n}];"
+      },
+      "id": "71e1c2f5-5dd9-4049-b19f-cfc8c5640a56",
+      "name": "Restore videoFile Property",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -3220,
+        1480
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "return [{\n  json: {\n    url: $json.url,\n    videoFile: $json.videoFile,\n    formattedVideoCommand: `yt-dlp -q --no-progress -f \"bestvideo[height<=480]+bestaudio/best[height<=480]\" \"${$json.url}\" -o \"${$json.videoFile}\" --force-overwrites --recode-video mp4`\n  }\n}];"
+      },
+      "id": "138c4bf5-9bb5-4466-852a-c17adf5598d4",
+      "name": "Format Download Commands",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -3740,
+        1500
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const now = Date.now();\nreturn [{\n  json: {\n    url: $json.url,\n    videoFile: `/tmp/video_${now}.mp4`\n  }\n}];"
+      },
+      "id": "58782f67-b09f-4589-b4ee-157a5f33cf84",
+      "name": "Generate Unique Filenames",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -4120,
+        1560
+      ]
+    },
+    {
+      "parameters": {
+        "keepOnlySet": true,
+        "values": {
+          "string": [
+            {
+              "name": "url",
+              "value": "https://www.youtube.com/shorts/6eYpCgjkU-U"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f587a57b-3a95-4b2d-8182-78cfa39d5a22",
+      "name": "Set YouTube URL1",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        -4380,
+        1560
+      ]
+    },
+    {
+      "parameters": {
+        "command": "={{ $json.formattedVideoCommand }}"
+      },
+      "id": "67210bfd-8dba-4af4-8bf8-57e6fed5e054",
+      "name": "Download Video",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        -3560,
+        1280
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "functionCode": "if (!$json.videoFile) { throw new Error('videoFile is undefined!'); }\nconsole.log('videoFile path:', $json.videoFile);\nreturn $input.item;"
+      },
+      "id": "f1efbd14-fdd0-4eb5-9be8-6670d416ca3a",
+      "name": "Debug Video File Path",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -3100,
+        1200
+      ]
+    },
+    {
+      "parameters": {
+        "filePath": "={{ $json.videoFile }}"
+      },
+      "id": "f100f874-e7d0-4e4f-aad0-7cac71244a19",
+      "name": "Read Video File",
+      "type": "n8n-nodes-base.readBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        -2840,
+        1480
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "console.log('Video binary data:', $binary);\nreturn $input.item;"
+      },
+      "id": "258f7ca9-121e-4b07-aa5d-2c0e1daf73bb",
+      "name": "Debug Video Binary",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -2720,
+        1200
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const now = Date.now();\nconst audioFile = `/tmp/workspace/audio_${now}.mp3`;\nconst transcriptFile = `/tmp/workspace/transcript_${now}.txt`;\n// We add 'ls -l' to check if the file exists before running whisper.cpp\nconst whisperCommand = `ls -l ${audioFile} && /opt/whisper.cpp/main -m /opt/whisper.cpp/models/ggml-base.en.bin -f ${audioFile} -of ${transcriptFile}`;\n\nreturn [{\n  json: {\n    ...$json,\n    audioFile: audioFile,\n    transcriptFile: transcriptFile,\n    formattedAudioCommand: `yt-dlp -q --no-progress -x --audio-format mp3 \"${$json.url}\" -o \"${audioFile}\" --force-overwrites`,\n    whisperCommand: whisperCommand\n  }\n}];"
+      },
+      "id": "cde34f98-ed66-469a-814a-7eaefa766d76",
+      "name": "Format Download Command",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -3720,
+        1860
+      ]
+    },
+    {
+      "parameters": {
+        "command": "={{ $json.formattedAudioCommand }}"
+      },
+      "id": "fd239387-da59-461b-9558-456d8d673ef7",
+      "name": "Download Audio",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        -3540,
+        1980
+      ]
+    },
+    {
+      "parameters": {
+        "filePath": "={{ $json.audioFile }}"
+      },
+      "id": "6e442154-9b11-4da2-80cd-af9b569cf6b0",
+      "name": "Read Binary File",
+      "type": "n8n-nodes-base.readBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        -2900,
+        2080
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "console.log('Binary data:', $binary);\nreturn $input.item;"
+      },
+      "id": "59ec1ae7-ce42-433c-b9c5-f0841e818882",
+      "name": "Debug Binary",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -2740,
+        2080
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "return [{\n  json: {\n    ...$json,\n    audioFile: $json.audioFile || $item(0).$json.audioFile\n  }\n}];"
+      },
+      "id": "32daf69d-3d8f-46b9-b73a-62db1e6faf7b",
+      "name": "Restore videoFile Property1",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -3080,
+        1880
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "mergeByIndex"
+      },
+      "id": "a252fac1-eab7-4e15-b8be-46e140119bd4",
+      "name": "Merge Video Metadata1",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 1,
+      "position": [
+        -3320,
+        1880
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const now = Date.now();\nconst baseFile = `/tmp/workspace/transcript_${now}`;\n// yt-dlp will add '.en.vtt' to the base filename. This is the file we need to read.\nconst finalFile = `${baseFile}.en.vtt`; \n\n// In the command, we tell yt-dlp to use the base name. It will add its own extensions.\nconst command = `yt-dlp --write-auto-subs --sub-lang en --skip-download -o \"${baseFile}\" \"${$json.url}\"`;\n\nreturn [{\n  json: {\n    ...$json,\n    // Pass the *actual* filename to the next nodes\n    transcriptFile: finalFile, \n    ytDlpSubsCommand: command\n  }\n}];"
+      },
+      "id": "7d5ece32-5bee-4ec0-bd80-9a734e91877a",
+      "name": "Format YTDLP Subs Command",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -4240,
+        940
+      ]
+    },
+    {
+      "parameters": {
+        "command": "={{$json.ytDlpSubsCommand}}"
+      },
+      "id": "bf47b575-1e97-4674-bab4-56084f4d903d",
+      "name": "Get Subs with YTDLP",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        -4040,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "filePath": "={{ $json.transcriptFile }}"
+      },
+      "id": "8036b2f1-d932-4b0a-aee0-d6d6affe9338",
+      "name": "Read Transcript File",
+      "type": "n8n-nodes-base.readBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        -3540,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const vttContent = Buffer.from($input.item.binary.data.data, 'base64').toString('utf8');\nconst lines = vttContent.split('\\n');\nconst captions = [];\nlet i = 0;\n\nwhile (i < lines.length) {\n  const line = lines[i];\n  const tsMatch = line.match(/^(\\d{2}:\\d{2}:\\d{2}\\.\\d{3})\\s+-->/);\n  if (tsMatch) {\n    const nextLine = (i + 1 < lines.length) ? lines[i + 1].trim() : '';\n    if (nextLine && !nextLine.startsWith('WEBVTT')) {\n      const cleanLine = nextLine.replace(/<[^>]+>/g, '').replace(/\\s+/g, ' ').trim();\n      if (cleanLine) {\n        captions.push(cleanLine);\n      }\n    }\n  }\n  i++;\n}\n\n// Remove consecutive duplicate lines\nconst deduped = [];\nfor (let i = 0; i < captions.length; i++) {\n  if (i === 0 || captions[i] !== captions[i - 1]) {\n    deduped.push(captions[i]);\n  }\n}\nconst output = deduped.join('|');\n\nreturn [{\n  binary: {\n    data: Buffer.from(output, 'utf8')\n  },\n  json: {\n    transcript: output // Only output the plain text\n  }\n}];"
+      },
+      "id": "4ec732e1-fc04-4b04-abee-d6ad785026ee",
+      "name": "Clean VTT Transcript",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -3300,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "mergeByIndex"
+      },
+      "id": "8f17480f-956a-4f4c-8573-a3dedb1cfc6f",
+      "name": "Merge Video Metadata2",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 1,
+      "position": [
+        -3780,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Download video",
+        "height": 480,
+        "width": 1260,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -3780,
+        1180
+      ],
+      "typeVersion": 1,
+      "id": "d5821002-26c8-486c-a955-0ac87f052c06",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Download Audio\n",
+        "height": 440,
+        "width": 1240,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -3760,
+        1780
+      ],
+      "typeVersion": 1,
+      "id": "64196d4b-69d6-407e-b2bb-6fd6376f0816",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Download Transcript\n",
+        "height": 380,
+        "width": 1120,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -4260,
+        720
+      ],
+      "typeVersion": 1,
+      "id": "b85d0b9b-80a2-4e40-ae51-b9203f4d7aa2",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatDeepSeek",
+      "typeVersion": 1,
+      "position": [
+        -2820,
+        1080
+      ],
+      "id": "5d8988e2-bdac-4fba-ad0f-cd37379f3a42",
+      "name": "DeepSeek Chat Model",
+      "credentials": {
+        "deepSeekApi": {
+          "id": "4Lip5gzZ7eiqN4ZK",
+          "name": "DeepSeek account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "const vttContent = Buffer.from($input.item.binary.data.data, 'base64').toString('utf8');\nconst lines = vttContent.split('\\n');\nconst blocks = [];\nlet i = 0;\n\nwhile (i < lines.length) {\n  // Match timestamp lines\n  const tsMatch = lines[i].match(/^(\\d{2}:\\d{2}:\\d{2}\\.\\d{3}) --> (\\d{2}:\\d{2}:\\d{2}\\.\\d{3})/);\n  if (tsMatch) {\n    const timestamp = `${tsMatch[1]} --> ${tsMatch[2]}`;\n    // Find the next non-empty line (caption text)\n    let text = '';\n    let j = i + 1;\n    while (j < lines.length && lines[j].trim() === '') j++;\n    if (j < lines.length) {\n      text = lines[j].replace(/<[^>]+>/g, '').replace(/\\s+/g, ' ').trim();\n      // Only accept if the line does NOT contain inline <c> tags or any other tags and is not empty\n      if (text && !lines[j].includes('<c>') && !lines[j].includes('<')) {\n        blocks.push({ timestamp, text });\n      }\n    }\n    i = j;\n  } else {\n    i++;\n  }\n}\n\n// Remove consecutive duplicate captions (with timestamps)\nconst dedupedBlocks = [];\nfor (let k = 0; k < blocks.length; k++) {\n  if (k === 0 || blocks[k].text !== blocks[k - 1].text) {\n    dedupedBlocks.push(blocks[k]);\n  }\n}\n\n// Format for file output\nconst output = dedupedBlocks.map(b => `[${b.timestamp}]\\n${b.text}`).join('\\n\\n');\n\nreturn [{\n  json: {\n    blocks: dedupedBlocks,\n    transcriptWithTimestamps: output\n  },\n  binary: {\n    data: Buffer.from(output, 'utf8')\n  }\n}];"
+      },
+      "id": "158f3846-440d-462a-aa4f-dc4a23df39a5",
+      "name": "Clean VTT Transcript (Caps)",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -3300,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const content = Buffer.from($input.item.binary.data.data, 'base64').toString('utf8');\nreturn [{ json: { content } }];"
+      },
+      "id": "43ee44b6-ffca-47d6-8b07-1d9fbf14b98a",
+      "name": "Convert Transcript to Text",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -3040,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Translate the following transcript to Chinese. Keep the format unchanged.\n\n{{ $json.content }}",
+        "options": {}
+      },
+      "id": "b8e2e7d4-0989-4eb2-ae21-f2a357252689",
+      "name": "AI Agent Translate Transcript",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        -2820,
+        900
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking 'Execute workflow'": {
+      "main": [
+        [
+          {
+            "node": "Set YouTube URL1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Video Metadata": {
+      "main": [
+        [
+          {
+            "node": "Restore videoFile Property",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore videoFile Property": {
+      "main": [
+        [
+          {
+            "node": "Debug Video File Path",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Video File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Download Commands": {
+      "main": [
+        [
+          {
+            "node": "Merge Video Metadata",
+            "type": "main",
+            "index": 1
+          },
+          {
+            "node": "Download Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Unique Filenames": {
+      "main": [
+        [
+          {
+            "node": "Format Download Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set YouTube URL1": {
+      "main": [
+        [
+          {
+            "node": "Generate Unique Filenames",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Video": {
+      "main": [
+        [
+          {
+            "node": "Merge Video Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Video File": {
+      "main": [
+        [
+          {
+            "node": "Debug Video Binary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Download Command": {
+      "main": [
+        [
+          {
+            "node": "Download Audio",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Video Metadata1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Audio": {
+      "main": [
+        [
+          {
+            "node": "Merge Video Metadata1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Read Binary File": {
+      "main": [
+        [
+          {
+            "node": "Debug Binary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore videoFile Property1": {
+      "main": [
+        [
+          {
+            "node": "Read Binary File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Video Metadata1": {
+      "main": [
+        [
+          {
+            "node": "Restore videoFile Property1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format YTDLP Subs Command": {
+      "main": [
+        [
+          {
+            "node": "Get Subs with YTDLP",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Video Metadata2",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Get Subs with YTDLP": {
+      "main": [
+        [
+          {
+            "node": "Merge Video Metadata2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Video Metadata2": {
+      "main": [
+        [
+          {
+            "node": "Read Transcript File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Transcript File": {
+      "main": [
+        [
+          {
+            "node": "Clean VTT Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean VTT Transcript": {
+      "main": [
+        [
+          {
+            "node": "Convert Transcript to Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeepSeek Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent Translate Transcript",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert Transcript to Text": {
+      "main": [
+        [
+          {
+            "node": "AI Agent Translate Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "33aedf11-979e-467c-8ad7-f3d87615d030",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "94d74c911e13a49b3d100732caebd73d7ad1ccb444c81b5fed33dd3ea57d1e2f"
+  },
+  "id": "kH8N1XPmsTKuFQFT",
+  "tags": []
+}
