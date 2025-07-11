@@ -389,6 +389,144 @@
         -2820,
         900
       ]
+    },
+    {
+      "parameters": {
+        "mode": "mergeByIndex"
+      },
+      "id": "merge-audio-transcript",
+      "name": "Merge Audio with Translated Transcript",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 1,
+      "position": [
+        -2600,
+        1880
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Combine audio file with translated transcript\nconst audioFile = $item(0).$json.audioFile;\nconst translatedTranscript = $item(1).$json.output || $item(1).$json.text || $item(1).$json.content;\n\nreturn [{\n  json: {\n    audioFile: audioFile,\n    translatedTranscript: translatedTranscript,\n    // You can add more processing here like creating a subtitle file\n    subtitleFile: `/tmp/workspace/subtitles_${Date.now()}.srt`\n  }\n}];"
+      },
+      "id": "combine-audio-transcript",
+      "name": "Combine Audio and Transcript",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -2400,
+        1880
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Create SRT subtitle file from translated transcript\nconst translatedTranscript = $json.translatedTranscript;\nconst subtitleFile = $json.subtitleFile;\n\n// Split transcript into sentences and create SRT format\nconst sentences = translatedTranscript.split(/[.!?]+/).filter(s => s.trim().length > 0);\nlet srtContent = '';\n\nsentences.forEach((sentence, index) => {\n  const startTime = index * 3; // 3 seconds per sentence\n  const endTime = startTime + 3;\n  const startTimeStr = `${Math.floor(startTime / 60).toString().padStart(2, '0')}:${(startTime % 60).toString().padStart(2, '0')}:00,000`;\n  const endTimeStr = `${Math.floor(endTime / 60).toString().padStart(2, '0')}:${(endTime % 60).toString().padStart(2, '0')}:00,000`;\n  \n  srtContent += `${index + 1}\\n${startTimeStr} --> ${endTimeStr}\\n${sentence.trim()}\\n\\n`;\n});\n\nreturn [{\n  json: {\n    ...$json,\n    srtContent: srtContent\n  },\n  binary: {\n    data: Buffer.from(srtContent, 'utf8'),\n    fileName: subtitleFile.split('/').pop()\n  }\n}];"
+      },
+      "id": "create-subtitle-file",
+      "name": "Create Subtitle File",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -2200,
+        1880
+      ]
+    },
+    {
+      "parameters": {
+        "fileName": "={{ $json.subtitleFile }}",
+        "options": {}
+      },
+      "id": "write-subtitle-file",
+      "name": "Write Subtitle File",
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        -2000,
+        1880
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.ttsElevenLabs",
+      "typeVersion": 1,
+      "position": [
+        -1800,
+        1880
+      ],
+      "id": "chinese-tts",
+      "name": "Chinese Text-to-Speech",
+      "credentials": {
+        "elevenLabsApi": {
+          "id": "your-elevenlabs-credential-id",
+          "name": "ElevenLabs"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Prepare text for TTS\nconst translatedText = $json.output || $json.text || $json.content;\n// Clean the text for better TTS quality\nconst cleanText = translatedText.replace(/[\\n\\r]/g, ' ').replace(/\\s+/g, ' ').trim();\n\nreturn [{\n  json: {\n    ...$json,\n    text: cleanText,\n    voice_id: \"21m00Tcm4TlvDq8ikWAM\", // Rachel voice ID for Chinese\n    model_id: \"eleven_multilingual_v2\"\n  }\n}];"
+      },
+      "id": "prepare-tts-text",
+      "name": "Prepare Text for TTS",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -2000,
+        1880
+      ]
+    },
+    {
+      "parameters": {
+        "command": "ffmpeg -i \"{{ $json.videoFile }}\" -i \"{{ $json.chineseAudioFile }}\" -map 0:v -map 1:a -c:v copy -c:a aac -shortest \"{{ $json.outputVideoFile }}\""
+      },
+      "id": "replace-audio-ffmpeg",
+      "name": "Replace Audio with Chinese",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        -1400,
+        1880
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Generate output filenames\nconst now = Date.now();\nconst chineseAudioFile = `/tmp/workspace/chinese_audio_${now}.mp3`;\nconst outputVideoFile = `/tmp/workspace/video_with_chinese_audio_${now}.mp4`;\n\nreturn [{\n  json: {\n    ...$json,\n    chineseAudioFile: chineseAudioFile,\n    outputVideoFile: outputVideoFile\n  }\n}];"
+      },
+      "id": "prepare-output-files",
+      "name": "Prepare Output Files",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -1600,
+        1880
+      ]
+    },
+    {
+      "parameters": {
+        "fileName": "={{ $json.chineseAudioFile }}",
+        "options": {}
+      },
+      "id": "save-chinese-audio",
+      "name": "Save Chinese Audio",
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        -1600,
+        1700
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Get the original video file path\nconst videoFile = $item(0).$json.videoFile;\nconst chineseAudioFile = $json.chineseAudioFile;\nconst outputVideoFile = $json.outputVideoFile;\n\nreturn [{\n  json: {\n    videoFile: videoFile,\n    chineseAudioFile: chineseAudioFile,\n    outputVideoFile: outputVideoFile\n  }\n}];"
+      },
+      "id": "prepare-video-replacement",
+      "name": "Prepare Video Replacement",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -1200,
+        1880
+      ]
     }
   ],
   "pinData": {},
@@ -632,13 +770,144 @@
           }
         ]
       ]
+    },
+    "AI Agent Translate Transcript": {
+      "main": [
+        [
+          {
+            "node": "Prepare Text for TTS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Audio with Translated Transcript": {
+      "main": [
+        [
+          {
+            "node": "Restore videoFile Property1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "AI Agent Translate Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Audio and Transcript": {
+      "main": [
+        [
+          {
+            "node": "Merge Audio with Translated Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Subtitle File": {
+      "main": [
+        [
+          {
+            "node": "Combine Audio and Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Subtitle File": {
+      "main": [
+        [
+          {
+            "node": "Create Subtitle File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chinese Text-to-Speech": {
+      "main": [
+        [
+          {
+            "node": "Prepare Text for TTS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Text for TTS": {
+      "main": [
+        [
+          {
+            "node": "AI Agent Translate Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Replace Audio with Chinese": {
+      "main": [
+        [
+          {
+            "node": "Prepare Video Replacement",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Output Files": {
+      "main": [
+        [
+          {
+            "node": "Chinese Text-to-Speech",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Chinese Audio": {
+      "main": [
+        [
+          {
+            "node": "Chinese Text-to-Speech",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Video Replacement": {
+      "main": [
+        [
+          {
+            "node": "Save Chinese Audio",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Debug Video Binary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "33aedf11-979e-467c-8ad7-f3d87615d030",
+  "versionId": "664a3741-c5c4-41d9-a4f6-9e5eb8f2f3ac",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "94d74c911e13a49b3d100732caebd73d7ad1ccb444c81b5fed33dd3ea57d1e2f"
